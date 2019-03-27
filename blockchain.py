@@ -30,7 +30,7 @@ class Blockchain:
     def __init__(self, public_key, node_id):
         """The constructor of the Blockchain class."""
         # Our starting block for the blockchain
-        genesis_block = Block(0, '', [], 100, 0)
+        genesis_block = Block(0, '1', [], 100, 0)
         # Initializing our (empty) blockchain list
         self.chain = [genesis_block]
         # Unhandled transactions
@@ -45,7 +45,7 @@ class Blockchain:
     # below) and a setter (@chain.setter)
     @property
     def chain(self):
-        return self.__chain[:]
+        return self.__chain[:]  #a copy of it
 
     # The setter for the chain property
     @chain.setter
@@ -117,6 +117,7 @@ class Blockchain:
                 saveable_tx = [tx.__dict__ for tx in self.__open_transactions]
                 f.write(json.dumps(saveable_tx))
                 f.write('\n')
+                #first i have to convert the set into list to save it    
                 f.write(json.dumps(list(self.__peer_nodes)))
         except IOError:
             print('Saving failed!')
@@ -127,7 +128,7 @@ class Blockchain:
         last_block = self.__chain[-1]
         last_hash = hash_block(last_block)
         proof = 0
-        # Try different PoW numbers and return the first valid one
+        # Try different numbers and return the first valid one 
         while not Verification.valid_proof(
             self.__open_transactions,
             last_hash, proof
@@ -159,10 +160,10 @@ class Blockchain:
             if tx.sender == participant
         ]
         tx_sender.append(open_tx_sender)
-        #here we need the sum(tx_amt) instead of tx_amt[0] otherwise if a make
-        #  many transactions before i mine a block then only the first one will be added
+        #so far we have a list of only amounts that corellates with the sender
         amount_sent = reduce(lambda tx_sum, tx_amt: tx_sum + sum(tx_amt)
                              if len(tx_amt) > 0 else tx_sum + 0, tx_sender, 0)
+        print('amount sent = ',amount_sent)             
         # This fetches received coin amounts of transactions that were already
         # included in blocks of the blockchain
         # We ignore open transactions here because you shouldn't be able to
@@ -208,10 +209,7 @@ class Blockchain:
             :amount: The amount of coins sent with the transaction
             (default = 1.0)
         """
-       
         transaction = Transaction(sender, recipient, signature, amount)
-        #reminder: the Verification.verify_transaction() returns true or false 
-        # if the amount is enough for the transaction and the signature is verified
         if Verification.verify_transaction(transaction, self.get_balance):
             self.__open_transactions.append(transaction)
             self.save_data()
@@ -246,7 +244,6 @@ class Blockchain:
         hashed_block = hash_block(last_block)
         proof = self.proof_of_work()
         # Miners should be rewarded, so let's create a reward transaction
-        #and reward them with 10 NBC
         reward_transaction = Transaction(
             'MINING', self.public_key, '', MINING_REWARD)
         # Copy transaction instead of manipulating the original
@@ -255,14 +252,12 @@ class Blockchain:
         # we don't have the reward transaction stored in the open transactions
         copied_transactions = self.__open_transactions[:]
         for tx in copied_transactions:
-            if not Wallet.verify_transaction(tx):       # = if not a valid signature
+            if not Wallet.verify_transaction(tx):
                 return None
         copied_transactions.append(reward_transaction)
         block = Block(len(self.__chain), hashed_block,
                       copied_transactions, proof)
         self.__chain.append(block)
-        # reset the open transaction because i just added the into 
-        #the block i am going to append to the blockchain
         self.__open_transactions = []
         self.save_data()
         for node in self.__peer_nodes:
@@ -290,7 +285,6 @@ class Blockchain:
             tx['amount']) for tx in block['transactions']]
         # Validate the proof of work of the block and store the result (True
         # or False) in a variable
-        print('transactions[:-1] = ',transactions[:-1])
         proof_is_valid = Verification.valid_proof(
             transactions[:-1], block['previous_hash'], block['proof'])
         # Check if previous_hash stored in the block is equal to the local
@@ -391,3 +385,4 @@ class Blockchain:
     def get_peer_nodes(self):
         """Return a list of all connected peer nodes."""
         return list(self.__peer_nodes)
+
